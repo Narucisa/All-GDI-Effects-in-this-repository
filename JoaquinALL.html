@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>GDI+ Canvas Effects</title>
+<style>
+body { background:#111; color:#eee; font-family:sans-serif; }
+canvas { border:1px solid #444; display:block; margin:10px 0; }
+button, input { margin:3px; }
+</style>
+</head>
+<body>
+
+<h2>GDI+ Effects Canvas</h2>
+
+<input type="file" id="upload">
+<button onclick="saveCanvas()">Save Canvas</button>
+<br>
+
+<button onclick="toggle('sine')">Sine</button>
+<button onclick="toggle('circles')">Bouncing Circles</button>
+<button onclick="toggle('hsl')">HSL Hue</button>
+<button onclick="toggle('xor')">XOR</button>
+<button onclick="toggle('bitblt')">BitBlt222</button>
+<button onclick="toggle('melt')">Melt</button>
+<button onclick="toggle('rgbquad')">RGBQUAD</button>
+<button onclick="toggle('fisheye')">Fisheye</button>
+<button onclick="toggle('ripple')">Ripple</button>
+<button onclick="toggle('swirl')">Swirl</button>
+<button onclick="toggle('scroll')">Scroll</button>
+
+<canvas id="c" width="800" height="450"></canvas>
+
+<script>
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d");
+const off = document.createElement("canvas");
+off.width = canvas.width;
+off.height = canvas.height;
+const octx = off.getContext("2d");
+
+let img = null;
+let t = 0;
+
+const effects = {
+  sine:0, circles:0, hsl:0, xor:0,
+  bitblt:0, melt:0, rgbquad:0,
+  fisheye:0, ripple:0, swirl:0, scroll:0
+};
+
+document.getElementById("upload").onchange = e => {
+  const im = new Image();
+  im.onload = () => img = im;
+  im.src = URL.createObjectURL(e.target.files[0]);
+};
+
+function toggle(e){ effects[e] ^= 1; }
+
+function saveCanvas(){
+  const a = document.createElement("a");
+  a.download = "canvas.png";
+  a.href = canvas.toDataURL();
+  a.click();
+}
+
+function loop(){
+  t++;
+
+  if(img){
+    ctx.drawImage(img,0,0,canvas.width,canvas.height);
+  } else {
+    ctx.fillStyle="#000";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+  }
+
+  octx.drawImage(canvas,0,0);
+  let id = ctx.getImageData(0,0,canvas.width,canvas.height);
+  let d = id.data;
+
+  for(let y=0;y<canvas.height;y++){
+    for(let x=0;x<canvas.width;x++){
+      let i=(y*canvas.width+x)*4;
+
+      let r=d[i], g=d[i+1], b=d[i+2];
+
+      if(effects.xor){
+        r ^= (x+t)&255;
+        g ^= (y+t)&255;
+        b ^= (x^y^t)&255;
+      }
+
+      if(effects.rgbquad){
+        r = (r + t*2) & 255;
+        g = (g ^ (x+t)) & 255;
+        b = (b + y*t) & 255;
+      }
+
+      d[i]=r; d[i+1]=g; d[i+2]=b;
+    }
+  }
+  ctx.putImageData(id,0,0);
+
+  if(effects.sine){
+    ctx.drawImage(
+      off,
+      Math.sin(t*0.05)*10,
+      Math.sin(t*0.03)*10
+    );
+  }
+
+  if(effects.scroll){
+    ctx.drawImage(off, (t*2)%canvas.width, 0);
+  }
+
+  if(effects.bitblt){
+    ctx.drawImage(off, 10, 10, canvas.width-20, canvas.height-20);
+  }
+
+  if(effects.melt){
+    for(let y=0;y<canvas.height;y+=4){
+      ctx.drawImage(off,0,y,canvas.width,4,Math.sin(t*0.02+y)*15,y,canvas.width,4);
+    }
+  }
+
+  if(effects.fisheye){
+    ctx.save();
+    ctx.translate(canvas.width/2,canvas.height/2);
+    ctx.scale(1+Math.sin(t*0.02)*0.2,1);
+    ctx.translate(-canvas.width/2,-canvas.height/2);
+    ctx.drawImage(off,0,0);
+    ctx.restore();
+  }
+
+  if(effects.ripple){
+    ctx.drawImage(
+      off,
+      Math.sin((t+x)*0.1)*5,
+      Math.cos((t+y)*0.1)*5
+    );
+  }
+
+  if(effects.swirl){
+    ctx.save();
+    ctx.translate(canvas.width/2,canvas.height/2);
+    ctx.rotate(Math.sin(t*0.01));
+    ctx.drawImage(off,-canvas.width/2,-canvas.height/2);
+    ctx.restore();
+  }
+
+  if(effects.hsl){
+    ctx.globalCompositeOperation="hue";
+    ctx.fillStyle=`hsl(${t%360},100%,50%)`;
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.globalCompositeOperation="source-over";
+  }
+
+  if(effects.circles){
+    for(let i=0;i<5;i++){
+      ctx.beginPath();
+      ctx.arc(
+        (Math.sin(t*0.02+i)*0.5+0.5)*canvas.width,
+        (Math.cos(t*0.03+i)*0.5+0.5)*canvas.height,
+        20,0,Math.PI*2
+      );
+      ctx.strokeStyle="white";
+      ctx.stroke();
+    }
+  }
+
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+
+</body>
+</html>
